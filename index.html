@@ -10,10 +10,16 @@
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@400;700&family=Poppins:wght@300;400;600;700&display=swap');
+        html {
+            scroll-behavior: smooth;
+            /* aktifkan smooth scrolling */
+        }
+        
         body {
             background: radial-gradient(1200px 600px at 50% -200px, rgba(255, 192, 203, 0.15), transparent), linear-gradient(120deg, #1a0f1f 0%, #2c1424 50%, #1f1f2e 100%);
-            overflow: hidden;
-            height: 100vh;
+            /* izinkan vertical scroll dan atur minimal tinggi layar agar tata letak awal tetap terjaga */
+            overflow-x: hidden;
+            min-height: 100vh;
             color: white;
             font-family: 'Poppins', sans-serif;
             position: relative;
@@ -193,6 +199,35 @@
             padding: 10px 20px;
             border-radius: 10px;
             display: none;
+        }
+        /* Tombol scroll-to-top */
+        
+        #scrollTopBtn {
+            position: fixed;
+            right: 20px;
+            bottom: 24px;
+            width: 44px;
+            height: 44px;
+            border-radius: 999px;
+            background: linear-gradient(135deg, #ff69b4, #ff1493);
+            color: white;
+            border: none;
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            cursor: pointer;
+            z-index: 60;
+            transition: transform .18s ease, opacity .2s ease;
+        }
+        
+        #scrollTopBtn.hidden {
+            display: none;
+        }
+        
+        #scrollTopBtn:active {
+            transform: translateY(2px) scale(.98);
         }
         /* Slideshow */
         
@@ -477,6 +512,9 @@
 
     <div id="toast"></div>
 
+    <!-- Tombol scroll-to-top akan dibuat untuk meningkatkan pengalaman scroll -->
+    <button id="scrollTopBtn" class="hidden" aria-label="Scroll ke atas">⬆</button>
+
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.0/dist/confetti.browser.min.js"></script>
     <script>
         const startBtn = document.getElementById('startBtn');
@@ -644,6 +682,23 @@
             setTimeout(confettiBurst, 800);
         }
 
+        function prevSlide() {
+            if (!slides.length) return;
+
+            // Remove active class from current slide
+            slides[slideIndex].classList.remove('active');
+
+            // Update index to previous slide
+            slideIndex = (slideIndex - 1 + slides.length) % slides.length;
+            slides[slideIndex].classList.add('active');
+
+            // small effects for consistency
+            setTimeout(() => {
+                if (Math.random() > 0.4) createRosePetal();
+            }, 300);
+            setTimeout(confettiBurst, 600);
+        }
+
         function startSlideshow() {
             slideshowEl.classList.add('show');
             // Initial effects
@@ -746,6 +801,114 @@
             // sembunyikan tombol setelah mulai
             startBtn.style.display = 'none';
         });
+
+        /* Scroll-to-top button behavior */
+        (function() {
+            const scrollBtn = document.getElementById('scrollTopBtn');
+            if (!scrollBtn) return;
+
+            // tampilkan / sembunyikan berdasarkan posisi scroll
+            const toggle = () => {
+                if (window.scrollY > 200) {
+                    scrollBtn.classList.remove('hidden');
+                } else {
+                    scrollBtn.classList.add('hidden');
+                }
+            };
+
+            window.addEventListener('scroll', toggle, {
+                passive: true
+            });
+
+            // klik => scroll ke atas secara halus
+            scrollBtn.addEventListener('click', () => {
+                window.scrollTo({
+                    top: 0,
+                    behavior: 'smooth'
+                });
+            });
+
+            // inisialisasi tampilan
+            toggle();
+        })();
+
+        /* Swipe / gesture support for slideshow (mobile) */
+        (function() {
+            const el = slideshowEl;
+            if (!el) return;
+
+            let startX = 0;
+            let startY = 0;
+            let distX = 0;
+            let distY = 0;
+            const threshold = 50; // required min horizontal distance (px) to be considered swipe
+            const restraint = 100; // max vertical displacement allowed
+
+            function onStart(e) {
+                const t = e.touches ? e.touches[0] : e;
+                startX = t.clientX;
+                startY = t.clientY;
+                distX = 0;
+                distY = 0;
+                // pause auto slideshow while interacting
+                if (slideTimer) clearInterval(slideTimer);
+            }
+
+            function onMove(e) {
+                // prevent page horizontal scroll on mobile when swiping slideshow
+                // but only when horizontal movement exceeds vertical
+                const t = e.touches ? e.touches[0] : e;
+                distX = t.clientX - startX;
+                distY = t.clientY - startY;
+                if (Math.abs(distX) > Math.abs(distY)) {
+                    e.preventDefault();
+                }
+            }
+
+            function onEnd(e) {
+                if (Math.abs(distX) >= threshold && Math.abs(distY) <= restraint) {
+                    if (distX < 0) {
+                        // swipe left -> next
+                        nextSlide();
+                    } else {
+                        // swipe right -> prev
+                        prevSlide();
+                    }
+                }
+
+                // restart slideshow timer
+                if (slideTimer) clearInterval(slideTimer);
+                slideTimer = setInterval(nextSlide, 4000);
+            }
+
+            // touch events
+            el.addEventListener('touchstart', onStart, {
+                passive: true
+            });
+            el.addEventListener('touchmove', onMove, {
+                passive: false
+            });
+            el.addEventListener('touchend', onEnd, {
+                passive: true
+            });
+
+            // pointer fallback for desktops that support pointer events
+            el.addEventListener('pointerdown', function(e) {
+                if (e.pointerType === 'touch' || e.pointerType === 'pen') onStart(e);
+            }, {
+                passive: true
+            });
+            el.addEventListener('pointermove', function(e) {
+                if (e.pointerType === 'touch' || e.pointerType === 'pen') onMove(e);
+            }, {
+                passive: false
+            });
+            el.addEventListener('pointerup', function(e) {
+                if (e.pointerType === 'touch' || e.pointerType === 'pen') onEnd(e);
+            }, {
+                passive: true
+            });
+        })();
     </script>
 
 </body>
